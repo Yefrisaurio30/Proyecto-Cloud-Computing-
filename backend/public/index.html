@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Snake Cloud</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--accent:#22c55e;--text:#e2e8f0;--muted:#94a3b8}
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,system-ui,sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.wrap{display:grid;grid-template-columns:1fr 320px;gap:20px;max-width:900px;width:100%}
+.card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+h1{margin:0 0 8px;font-size:24px}
+canvas{background:#0b1220;border-radius:12px;display:block;margin:0 auto}
+.controls{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap;align-items:center}
+button{background:var(--accent);color:#052e16;border:none;padding:10px 16px;border-radius:10px;font-weight:700;cursor:pointer}
+button.secondary{background:#334155;color:var(--text)}
+input{padding:10px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:var(--text)}
+.info{display:flex;justify-content:space-between;margin:8px 0;color:var(--muted);font-size:14px}
+.top table{width:100%;border-collapse:collapse}
+.top th,.top td{padding:6px;border-bottom:1px solid #334155;text-align:left}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center}
+.modal .box{background:var(--card);padding:24px;border-radius:16px;text-align:center;min-width:280px}
+.modal.show{display:flex}
+@media(max-width:760px){.wrap{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>Snake Cloud</h1>
+    <div class="info"><span>Instancia: <b id="host">-</b></span><span>Puntaje: <b id="score">0</b></span><span>Tiempo: <b id="time">0s</b></span></div>
+    <canvas id="c" width="420" height="420"></canvas>
+    <div class="controls">
+      <button id="btnStart">Iniciar</button>
+      <button id="btnPause" class="secondary">Pausar</button>
+      <input id="name" placeholder="Tu nombre" maxlength="12">
+      <button id="btnName" class="secondary">Guardar</button>
+    </div>
+    <div class="info"><span>Manzanas: <b id="apples">0</b></span><span>Mejor: <b id="best">0</b></span></div>
+  </div>
+  <div class="card top">
+    <h3>Top 10</h3>
+    <table><thead><tr><th>Jugador</th><th>Puntaje</th></tr></thead><tbody id="tbody"></tbody></table>
+  </div>
+</div>
+<div class="modal" id="modal">
+  <div class="box">
+    <h2>Fin del juego</h2>
+    <p>Tiempo: <b id="mTime"></b></p>
+    <p>Manzanas: <b id="mApples"></b></p>
+    <button id="btnAgain">Jugar de nuevo</button>
+  </div>
+</div>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d'),G=21,N=20;
+let snake,dir,food,score=0,apples=0,alive=false,running=false,timer=null,startTs=0,elapsed=0,player='Anon',eatAnim=0,best=0;
+function init(){snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];dir={x:1,y:0};placeFood();score=0;apples=0;elapsed=0;alive=true;running=false;eatAnim=0;updateUI();}
+function placeFood(){do{food={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)}}while(snake.some(s=>s.x===food.x&&s.y===food.y));}
+function draw(){ctx.fillStyle='#0b1220';ctx.fillRect(0,0,c.width,c.height);ctx.strokeStyle='rgba(255,255,255,.05)';for(let i=0;i<=N;i++){ctx.beginPath();ctx.moveTo(i*G,0);ctx.lineTo(i*G,c.height);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i*G);ctx.lineTo(c.width,i*G);ctx.stroke();}
+for(let i=snake.length-1;i>=0;i--){const s=snake[i],t=i/snake.length;ctx.fillStyle=`rgb(${34+Math.floor(40*t)},${197-Math.floor(60*t)},${94})`;const sz=G-2-(i>0?Math.min(i,6):0);ctx.fillRect(s.x*G+(G-sz)/2,s.y*G+(G-sz)/2,sz,sz);}
+const h=snake[0];ctx.fillStyle='#22c55e';ctx.fillRect(h.x*G+2,h.y*G+2,G-4,G-4);
+const eyeOffset=dir.x!==0?{x:dir.x*4,y:-3}:{x:-3,y:dir.y*4};
+[[4,4],[4,G-8]].forEach(([ex,ey])=>{ctx.fillStyle='#052e16';ctx.beginPath();ctx.arc(h.x*G+ex+eyeOffset.x,h.y*G+ey+eyeOffset.y,2.5,0,Math.PI*2);ctx.fill();});
+const sc=eatAnim>0?1+eatAnim/10:1;ctx.save();ctx.translate(food.x*G+G/2,food.y*G+G/2);ctx.scale(sc,sc);ctx.fillStyle='#ef4444';ctx.beginPath();ctx.arc(0,0,G/2-2,0,Math.PI*2);ctx.fill();ctx.fillStyle='#16a34a';ctx.fillRect(-2,-G/2-2,4,6);ctx.restore();if(eatAnim>0)eatAnim--;}
+function step(){if(!running||!alive)return;const h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};if(h.x<0||h.x>=N||h.y<0||h.y>=N||snake.some(s=>s.x===h.x&&s.y===h.y)){alive=false;running=false;clearInterval(timer);showSummary();return;}snake.unshift(h);if(h.x===food.x&&h.y===food.y){apples++;score+=10;eatAnim=8;placeFood();}else snake.pop();updateUI();draw();}
+function updateUI(){document.getElementById('score').textContent=score;document.getElementById('apples').textContent=apples;document.getElementById('time').textContent=Math.floor(elapsed)+'s';document.getElementById('best').textContent=best;}
+function start(){if(!alive)init();running=true;startTs=Date.now()-elapsed*1000;timer=setInterval(()=>{elapsed=(Date.now()-startTs)/1000;updateUI();},500);draw();}
+function pause(){running=false;clearInterval(timer);}
+function toggle(){if(!alive)init();if(running)pause();else start();document.getElementById('btnStart').textContent=running?'En curso':'Iniciar';}
+function showSummary(){document.getElementById('mTime').textContent=Math.floor(elapsed)+'s';document.getElementById('mApples').textContent=apples;document.getElementById('modal').classList.add('show');submit();}
+async function submit(){await fetch('/snake/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({player,score})});loadTop();}
+async function loadTop(){const r=await fetch('/snake/scores');const d=await r.json();document.getElementById('host').textContent=d.host;const tb=document.getElementById('tbody');tb.innerHTML='';d.scores.forEach(x=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${x.player}</td><td>${x.score}</td>`;tb.appendChild(tr);});}
+async function loadHealth(){const r=await fetch('/health');const d=await r.json();document.getElementById('host').textContent=d.host;}
+document.getElementById('btnStart').onclick=toggle;
+document.getElementById('btnPause').onclick=()=>{pause();document.getElementById('btnStart').textContent='Iniciar';};
+document.getElementById('btnName').onclick=()=>{const v=document.getElementById('name').value.trim();if(v)player=v;};
+document.getElementById('btnAgain').onclick=()=>{document.getElementById('modal').classList.remove('show');init();draw();};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowUp'&&dir.y===0)dir={x:0,y:-1};if(e.key==='ArrowDown'&&dir.y===0)dir={x:0,y:1};if(e.key==='ArrowLeft'&&dir.x===0)dir={x:-1,y:0};if(e.key==='ArrowRight'&&dir.x===0)dir={x:1,y:0};if(e.code==='Space'){e.preventDefault();toggle();}});
+init();draw();loadHealth();loadTop();setInterval(()=>{if(running)step();else draw();},100);
+</script>
+</body>
+</html>
