@@ -2,6 +2,9 @@ auth_enabled: false
 server:
   http_listen_port: 3100
 ingester:
+  wal:
+    enabled: true
+    dir: /loki/wal
   lifecycler:
     address: 127.0.0.1
     ring:

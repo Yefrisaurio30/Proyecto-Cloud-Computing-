@@ -29,10 +29,12 @@ services:
     networks: [snake-net]
   loki:
     image: grafana/loki:2.9.2
+    user: root
     ports:
       - "3100:3100"
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/tmp/loki
     command: -config.file=/etc/loki/local-config.yaml
     networks: [snake-net]
   promtail:
@@ -54,5 +56,6 @@ services:
     networks: [snake-net]
 volumes:
   pgdata:
+  loki_data:
 networks:
   snake-net:
